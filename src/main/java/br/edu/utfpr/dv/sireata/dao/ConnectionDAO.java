@@ -10,55 +10,70 @@ import org.apache.tomcat.jdbc.pool.DataSource;
 import org.apache.tomcat.jdbc.pool.PoolProperties;
 
 public class ConnectionDAO {
-	
+
 	private String SERVER = "192.168.56.20";
 	private String DATABASE = "diget";
 	private String USER = "mysql";
 	private String PASSWORD = "mysql";
-	
+
 	private DataSource datasource = null;
 	private static ConnectionDAO instance = null;
-	
-	private ConnectionDAO(){}
-	
-	public static synchronized ConnectionDAO getInstance() throws SQLException{
-		if((ConnectionDAO.instance == null) || (ConnectionDAO.instance.datasource == null)){
+
+	private ConnectionDAO() {
+	}
+
+	public static synchronized ConnectionDAO getInstance() throws SQLException {
+		if ((ConnectionDAO.instance == null) || (ConnectionDAO.instance.datasource == null)) {
 			ConnectionDAO.instance = new ConnectionDAO();
 			ConnectionDAO.instance.createDataSource();
 		}
-		
+
 		return ConnectionDAO.instance;
 	}
-	
-	public Connection getConnection() throws SQLException{
+
+	public Connection getConnection() throws SQLException {
 		return this.datasource.getConnection();
 	}
-	
-	private void createDataSource() throws SQLException{
-		String user, password, server, database, driver, type; 
-		
-		try{
+
+	private void createDataSource() throws SQLException {
+		String user, password, server, database, driver, type;
+
+		try {
 			Properties props = new Properties();
-	        FileInputStream fis = new FileInputStream(this.getClass().getClassLoader().getResource("/dblocal.properties").getPath());
-	        
-	        props.load(fis);
-	        
-	        server = props.getProperty("DB_SERVER");
-	        database = props.getProperty("DB_NAME");
-	        user = props.getProperty("DB_USERNAME");
-	        password = props.getProperty("DB_PASSWORD");
-	        driver = props.getProperty("DB_DRIVER_CLASS");
-	        type = props.getProperty("DB_TYPE");
-	     }catch(Exception e){
-	    	server = SERVER;
-	    	database = DATABASE;
-	    	user = USER;
-	    	password = PASSWORD;
-	    	driver = "com.mysql.jdbc.Driver";
-	    	type = "mysql";
+			FileInputStream fis = new FileInputStream(
+					this.getClass().getClassLoader().getResource("/dblocal.properties").getPath());
+
+			props.load(fis);
+
+			server = props.getProperty("DB_SERVER");
+			database = props.getProperty("DB_NAME");
+			user = props.getProperty("DB_USERNAME");
+			password = props.getProperty("DB_PASSWORD");
+			driver = props.getProperty("DB_DRIVER_CLASS");
+			type = props.getProperty("DB_TYPE");
+		} catch (Exception e) {
+			server = SERVER;
+			database = DATABASE;
+			user = USER;
+			password = PASSWORD;
+			driver = "com.mysql.jdbc.Driver";
+			type = "mysql";
 		}
-		
+
 		PoolProperties p = new PoolProperties();
+		fillPoolProperties(p, server, database, user, password, driver, type);
+
+		datasource = new DataSource();
+		datasource.setPoolProperties(p);
+
+		if (type.equals("mysql")) {
+			Statement stmt = this.datasource.getConnection().createStatement();
+			stmt.execute("SET GLOBAL max_allowed_packet=1024*1024*14;");
+		}
+	}
+
+	public void fillPoolProperties(PoolProperties p, String server, String database, String user, String password,
+			String driver, String type) {
 		p.setUrl("jdbc:" + type + "://" + server + "/" + database);
 		p.setDriverClassName(driver);
 		p.setUsername(user);
@@ -78,15 +93,7 @@ public class ConnectionDAO {
 		p.setMinIdle(10);
 		p.setLogAbandoned(true);
 		p.setRemoveAbandoned(true);
-		p.setJdbcInterceptors("org.apache.tomcat.jdbc.pool.interceptor.ConnectionState;org.apache.tomcat.jdbc.pool.interceptor.StatementFinalizer");
-		
-		datasource = new DataSource();
-		datasource.setPoolProperties(p);
-        
-		if(type.equals("mysql")){
-			Statement stmt = this.datasource.getConnection().createStatement();
-			stmt.execute("SET GLOBAL max_allowed_packet=1024*1024*14;");	
-		}
+		p.setJdbcInterceptors(
+				"org.apache.tomcat.jdbc.pool.interceptor.ConnectionState;org.apache.tomcat.jdbc.pool.interceptor.StatementFinalizer");
 	}
-
 }
